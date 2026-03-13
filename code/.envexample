@@ -1,0 +1,5 @@
+# 阿里云百炼 API Key
+BAILIAN_API_KEY=
+
+# Tavily Search API (如果需要网络搜索功能)
+TAVILY_API_KEY=
