@@ -99,8 +99,8 @@ class InterviewState(MessagesState):
     context: Annotated[list, operator.add]
     # 当前正在访谈的分析师
     analyst: Analyst
-    # 存储访谈内容的字符串
-    interview: str
+    # 存储访谈内容的字符串（用于输出到主图）
+    interview: Annotated[list, operator.add]
     # 已撰写的报告章节列表
     sections: list
 
@@ -116,6 +116,8 @@ class ResearchGraphState(TypedDict):
     human_analyst_feedback: Optional[str]
     # 生成的分析师列表
     analysts: List[Analyst]
+    # 各分析师的访谈内容（综合上下文和对话）
+    interviews: Annotated[list, operator.add]
     # 各分析师撰写的章节
     sections: Annotated[list, operator.add]
     # 最终报告的引言

@@ -7,7 +7,7 @@ from typing import Optional
 from langchain_community.tools.tavily_search import TavilySearchResults
 from langchain_community.retrievers import ArxivRetriever
 from langchain_core.runnables import RunnableConfig
-from code.configuration import Configuration
+from storm.configuration import Configuration
 
 
 class SearchTools:

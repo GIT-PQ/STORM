@@ -16,7 +16,7 @@ from langgraph.graph import StateGraph, START, END
 # from langgraph.checkpoint.memory import InMemorySaver  # LangGraph API 自动处理此功能
 from langgraph.constants import Send
 
-from code.state import (
+from storm.state import (
     InterviewState,
     InputState,
     OutputState,
@@ -25,7 +25,7 @@ from code.state import (
     Perspectives,
     SearchQuery,
 )
-from code.prompts import (
+from storm.prompts import (
     ANALYST_INSTRUCTIONS,
     QUESTION_INSTRUCTIONS,
     ANSWER_INSTRUCTIONS,
@@ -34,9 +34,9 @@ from code.prompts import (
     REPORT_WRITER_INSTRUCTIONS,
     INTRO_CONCLUSION_INSTRUCTIONS,
 )
-from code.configuration import Configuration
-from code.tools import get_search_tools
-from code.utils import load_chat_model, generate_thread_id
+from storm.configuration import Configuration
+from storm.tools import get_search_tools
+from storm.utils import load_chat_model, generate_thread_id
 
 
 # ====================== 分析师生成节点 ======================
@@ -168,16 +168,17 @@ async def generate_answer(state: InterviewState, config: RunnableConfig) -> dict
 async def save_interview(state: InterviewState) -> dict:
     """保存完成的访谈内容
 
-    将对话内容转换为字符串格式并保存。
+    将对话内容转换为字符串格式并保存，用于传递到主图。
     """
     messages = state["messages"]
     interview_content = get_buffer_string(messages)
 
-    return {"interview": interview_content}
+    # 返回列表形式，以便与主图状态合并
+    return {"interview": [interview_content]}
 
 
 def route_messages(
-    state: InterviewState, name: str = "expert"
+        state: InterviewState, name: str = "expert"
 ) -> Literal["ask_question", "save_interview"]:
     """根据访谈进度确定下一步
 
@@ -208,22 +209,37 @@ async def write_section(state: InterviewState, config: RunnableConfig) -> dict:
     """根据访谈内容撰写报告章节
 
     从分析师的角度组织访谈内容，
-    撰写报告的一个章节。
+    撰写报告的一个章节。综合使用搜索结果和专家回答。
     """
     configuration = Configuration.from_runnable_config(config)
     model = load_chat_model(configuration.model)
 
     context = state["context"]
+    interview = state.get("interview", [])
     analyst = state["analyst"]
+
+    # 将所有搜索结果合并
+    formatted_context = "\n\n".join(context) if context else "无搜索结果"
+
+    # 将访谈内容合并（优先使用）
+    formatted_interview = "\n\n".join(interview) if interview else "无访谈内容"
 
     # 构建章节撰写提示词
     system_message = SECTION_WRITER_INSTRUCTIONS.format(focus=analyst.description)
 
-    # 撰写章节
+    # 撰写章节：优先使用访谈内容，搜索结果作为补充
     section = await model.ainvoke(
         [
             SystemMessage(content=system_message),
-            HumanMessage(content=f"使用此来源撰写你的章节：{context}"),
+            HumanMessage(
+                content=f"""请根据以下信息撰写你的章节：
+
+## 访谈内容：
+{formatted_interview}
+
+## 参考资料（搜索结果，必要时可引用）：
+{formatted_context}"""
+            ),
         ]
     )
 
@@ -347,27 +363,34 @@ async def finalize_report(state: ResearchGraphState) -> dict:
 
     将引言、正文和结论组合成完整的报告。
     """
+    import re
+
     content = state["content"]
 
     # 移除"## 洞察"标题
     if content.startswith("## 洞察"):
         content = content.strip("## 洞察")
 
-    # 分离来源部分
+    # 分离来源部分（使用正则表达式，更灵活地匹配各种格式）
     sources = None
+    # 匹配 "## 来源" 前后可能有任意空白字符的情况
+    pattern = r'\n*\s*## 来源\s*\n+'
     if "## 来源" in content:
-        try:
-            content, sources = content.split("\n## 来源\n")
-        except:
-            sources = None
+        match = re.search(pattern, content)
+        if match:
+            # match.end() 之后是来源内容
+            sources = content[match.end():].lstrip()
+            # 找到来源标题的起始位置，截取正文部分
+            source_header_start = content.find("## 来源")
+            content = content[:source_header_start].rstrip()
 
     # 组装最终报告
     final_report = (
-        state["introduction"]
-        + "\n\n---\n\n## 核心观点\n\n"
-        + content
-        + "\n\n---\n\n"
-        + state["conclusion"]
+            state["introduction"]
+            + "\n\n---\n\n## 核心观点\n\n"
+            + content
+            + "\n\n---\n\n"
+            + state["conclusion"]
     )
 
     # 添加来源部分

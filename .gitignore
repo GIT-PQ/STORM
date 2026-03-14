@@ -10,3 +10,5 @@
 /ZeppelinRemoteNotebooks/
 
 .idea
+
+storm/.env
