@@ -14,8 +14,8 @@ async def main():
     config = {
         "configurable": {
             "model": "bailian/qwen-plus",
-            "max_analysts": 1,
-            "max_interview_turns": 1,
+            "max_analysts": 3,
+            "max_interview_turns": 2,
             "tavily_max_results": 3,
             "arxiv_max_docs": 3,
             "parallel_interviews": True,
