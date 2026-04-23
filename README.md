@@ -213,5 +213,5 @@ flowchart LR
 MIT License
 
 ## 参考资料
-
+论文 [STORM](https://arxiv.org/abs/2402.14207)
 详细的运行流程说明请参阅 [docs/运行流程.md](docs/运行流程.md)
